@@ -7,6 +7,8 @@ import (
   "io/ioutil"
   "fmt"
   "time"
+  "strings"
+  "os"
 )
 
 type Item struct {
@@ -33,6 +35,34 @@ func (h * itemHandlers) getItems(w http.ResponseWriter, r *http.Request) {
   h.Unlock()
 
   jsonBytes, err := json.Marshal(items)
+
+  if err != nil {
+    w.WriteHeader(http.StatusInternalServerError)
+    w.Write([]byte(err.Error()))
+  }
+
+  w.Header().Add("content-type", "application/json")
+  w.Write(jsonBytes)
+}
+
+func (h * itemHandlers) getItem(w http.ResponseWriter, r *http.Request) {
+  parts := strings.Split(r.URL.String(), "/")
+
+  if len(parts) != 3 {
+    w.WriteHeader(http.StatusNotFound)
+    return
+  }
+
+  h.Lock()
+  item, ok := h.store[parts[2]]
+  h.Unlock()
+
+  if !ok {
+    w.WriteHeader(http.StatusNotFound)
+    return
+  }
+
+  jsonBytes, err := json.Marshal(item)
 
   if err != nil {
     w.WriteHeader(http.StatusInternalServerError)
@@ -87,8 +117,8 @@ func (h * itemHandlers) createItem(w http.ResponseWriter, r *http.Request) {
 func newItemHandlers() *itemHandlers {
   return &itemHandlers {
     store: map[string]Item{
-      "id1": Item {
-        Id: "id1",
+      "1655570749194813500": Item {
+        Id: "1655570749194813500",
         Name: "Carrots",
         Quantity: 10,
       },
@@ -96,12 +126,42 @@ func newItemHandlers() *itemHandlers {
   }
 }
 
+type adminPortal struct {
+  password string
+}
+
+func newAdminPortal() *adminPortal{
+  password := os.Getenv("ADMIN_PASSWORD")
+
+  if password == "" {
+    panic("Admin password not set")
+  }
+
+  return &adminPortal{password: password}
+}
+
+func (a adminPortal) handler(w http.ResponseWriter, r *http.Request) {
+  user, pass, ok := r.BasicAuth()
+
+  if !ok || user != "admin" || pass != a.password {
+    w.WriteHeader(http.StatusUnauthorized)
+    w.Write([]byte("Not authorized"))
+    return
+  }
+
+  w.Write([]byte("Super secret admin portal"))
+}
 
 func main() {
+  admin := newAdminPortal()
   itemHandlers := newItemHandlers()
 
   http.HandleFunc("/items/list", itemHandlers.getItems)
+  http.HandleFunc("/items/", itemHandlers.getItem)
   http.HandleFunc("/items/create", itemHandlers.createItem)
+
+  http.HandleFunc("/admin", admin.handler)
+
   err := http.ListenAndServe(":8081", nil)
   if err != nil {
     panic(err)
