@@ -9,6 +9,7 @@ import (
   "time"
   "strings"
   "os"
+  "math/rand"
 )
 
 type Item struct {
@@ -45,11 +46,48 @@ func (h * itemHandlers) getItems(w http.ResponseWriter, r *http.Request) {
   w.Write(jsonBytes)
 }
 
+func (h * itemHandlers) getRandomItem(w http.ResponseWriter, r *http.Request) {
+  ids := make([]string, len(h.store))
+  h.Lock()
+
+  i := 0
+  for id := range h.store {
+    ids[i] = id
+    i++
+  }
+
+  defer h.Unlock()
+
+  var target string
+  if len(ids) == 0 {
+    w.WriteHeader(http.StatusNotFound)
+    
+  } else if len(ids) == 1{
+    target = ids[0]
+    
+  } else {
+
+    rand.Seed(time.Now().UnixNano())
+  
+    target = ids[rand.Intn(len(ids))]
+  
+  }
+  
+  w.Header().Add("location", fmt.Sprintf("/items/%s", target))
+  w.WriteHeader(http.StatusFound)
+
+}
+
 func (h * itemHandlers) getItem(w http.ResponseWriter, r *http.Request) {
   parts := strings.Split(r.URL.String(), "/")
 
   if len(parts) != 3 {
     w.WriteHeader(http.StatusNotFound)
+    return
+  }
+
+  if parts[2] == "random" {
+    h.getRandomItem(w,r)
     return
   }
 
