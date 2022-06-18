@@ -29,3 +29,11 @@ List of available endpoints
 ## What I learned
 
 First contact with the GO languge, discovered endpoint routing, data structs request reading and response writting with simple error handling.
+
+
+## How to run 
+
+This API needs an env variable called `ADMIN_PASSWORD`, to run this server with this varialbe run the following command:
+`ADMIN_PASSWORD=secret go run src/server.go`
+
+PD: This server listens to port `8081`
